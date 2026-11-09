@@ -26,5 +26,6 @@ allprojects {
 }
 
 tasks.register("clean", Delete) {
-    delete layout.buildDirectory
+    delete rootProject.buildDir
+    delete "${rootDir}/third_party/wavesdk/build"
 }

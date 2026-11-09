@@ -118,6 +118,10 @@ public class DeviceType {
         return BuildConfig.FLAVOR_platform.equalsIgnoreCase("oculusvr") || BuildConfig.FLAVOR_platform.equalsIgnoreCase("oculusvrStore");
     }
 
+    public static boolean isWaveBuild() {
+        return BuildConfig.FLAVOR_platform.toLowerCase().contains("wavevr");
+    }
+
     public static boolean isHVRBuild() {
         return BuildConfig.FLAVOR_platform.toLowerCase().contains("hvr");
     }
@@ -144,6 +148,8 @@ public class DeviceType {
             type = "oculusvr";
         } else if (DeviceType.isPicoXR()) {
             type = "picoxr";
+        } else if (DeviceType.isWaveBuild()) {
+            type = "wavevrStore";
         } else if (DeviceType.isLynx()) {
             type = "lynx";
         } else if (DeviceType.isSnapdragonSpaces()) {
