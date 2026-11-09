@@ -9,6 +9,10 @@ apply from: "$project.rootDir/tools/gradle/versionCode.gradle"
 apply from: "$project.rootDir/tools/gradle/checkGeckoConfigFile.gradle"
 apply plugin: 'kotlin-android'
 
+// versions.gradle was removed upstream; WaveVR values live here now
+def versions = [wavevr: "5.6.0"]
+def build_versions = [min_sdk_wave: 25, target_sdk_wave: 31]
+
 // Apply AGConnect plugin only for Huawei builds
 if (getGradle().getStartParameter().getTaskRequests().toString() =~ /[Hh]vr/
         || getGradle().getStartParameter().getTaskRequests().toString() =~ /[Vv]isionglass/) {
