@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Room for the extra hand input tray button (one more 40dp button). -->
+    <item name="tray_world_width" format="float" type="dimen">1.63</item>
+    <dimen name="tray_width">284dp</dimen>
+</resources>

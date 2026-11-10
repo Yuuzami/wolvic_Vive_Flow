@@ -151,6 +151,11 @@ public interface WidgetManagerDelegate {
     void setPointerMode(@PointerMode int mode);
     void setHandTrackingEnabled(boolean value);
     boolean isHandTrackingEnabled();
+    void setHandInputAutoSwitchEnabled(boolean value);
+    boolean isHandInputAutoSwitchEnabled();
+    void setManualHandInput(boolean useHands);
+    boolean isManualHandInput();
+    void setRenderScale(int percent);
     void checkEyeTrackingPermissions(@NonNull EyeTrackingCallback callback);
     boolean isEyeTrackingSupported();
     boolean isHandTrackingSupported();

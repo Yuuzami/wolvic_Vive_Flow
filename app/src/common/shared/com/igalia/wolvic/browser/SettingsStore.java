@@ -100,7 +100,7 @@ public class SettingsStore {
     public final static boolean ENV_OVERRIDE_DEFAULT = false;
     public final static boolean SYSTEM_ROOT_CA_DEFAULT = false;
     public final static boolean UI_HARDWARE_ACCELERATION_DEFAULT = true;
-    public final static boolean UI_HARDWARE_ACCELERATION_DEFAULT_WAVEVR = false;
+    public final static boolean UI_HARDWARE_ACCELERATION_DEFAULT_WAVEVR = true;
     public final static boolean UI_HARDWARE_ACCELERATION_DEFAULT_MAGIC_LEAP_2 = false;
     public final static boolean PERFORMANCE_MONITOR_DEFAULT = true;
     public final static boolean DRM_PLAYBACK_DEFAULT = false;
@@ -172,6 +172,9 @@ public class SettingsStore {
     private final static long CRASH_RESTART_DELTA = 2000;
     public final static boolean AUTOPLAY_ENABLED = false;
     public final static boolean HEAD_LOCK_DEFAULT = false;
+    public final static boolean HAND_INPUT_AUTO_SWITCH_DEFAULT = true;
+    // Eye buffer size as a percentage of the panel's native resolution.
+    public final static int RENDER_SCALE_DEFAULT = 90;
     public final static boolean OPEN_TABS_IN_BACKGROUND_DEFAULT = true;
     public final static boolean DEBUG_LOGGING_DEFAULT = BuildConfig.DEBUG;
     public final static boolean POP_UPS_BLOCKING_DEFAULT = true;
@@ -462,6 +465,27 @@ public class SettingsStore {
     public void setHeadLockEnabled(boolean isEnabled) {
         SharedPreferences.Editor editor = mPrefs.edit();
         editor.putBoolean(mContext.getString(R.string.settings_key_head_lock), isEnabled);
+        editor.apply();
+    }
+
+    public boolean isHandInputAutoSwitchEnabled() {
+        return mPrefs.getBoolean(
+                mContext.getString(R.string.settings_key_hand_input_auto_switch), HAND_INPUT_AUTO_SWITCH_DEFAULT);
+    }
+
+    public void setHandInputAutoSwitchEnabled(boolean isEnabled) {
+        SharedPreferences.Editor editor = mPrefs.edit();
+        editor.putBoolean(mContext.getString(R.string.settings_key_hand_input_auto_switch), isEnabled);
+        editor.apply();
+    }
+
+    public int getRenderScalePercent() {
+        return mPrefs.getInt(mContext.getString(R.string.settings_key_render_scale), RENDER_SCALE_DEFAULT);
+    }
+
+    public void setRenderScalePercent(int percent) {
+        SharedPreferences.Editor editor = mPrefs.edit();
+        editor.putInt(mContext.getString(R.string.settings_key_render_scale), percent);
         editor.apply();
     }
 

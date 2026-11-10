@@ -12,6 +12,7 @@
     <string name="settings_key_start_with_passthrough" translatable="false">settings_start_with_passthrough</string>
     <string name="settings_key_latin_auto_complete" translatable="false">settings_latin_auto_complete</string>
     <string name="settings_key_head_lock" translatable="false">settings_head_lock</string>
+    <string name="settings_key_hand_input_auto_switch" translatable="false">settings_hand_input_auto_switch</string>
     <string name="settings_key_open_tabs_in_background" translatable="false">settings_open_tabs_in_background</string>
     <string name="settings_key_window_movement" translatable="false">settings_window_movement</string>
     <string name="settings_key_environment_override" translatable="false">settings_environment_override</string>
@@ -33,6 +34,7 @@
     <string name="settings_key_pointer_color" translatable="false">settings_pointer_color</string>
     <string name="settings_key_scroll_direction" translatable="false">settings_scroll_direction</string>
     <string name="settings_key_msaa" translatable="false">settings_gfx_msaa_v3</string>
+    <string name="settings_key_render_scale" translatable="false">settings_gfx_render_scale</string>
     <string name="settings_key_audio" translatable="false">settings_audio</string>
     <string name="settings_key_voice_search_service" translatable="false">settings_voice_search_service</string>
     <string name="settings_key_voice_search_language" translatable="false">settings_voice_search_language</string>

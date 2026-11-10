@@ -21,6 +21,7 @@ import com.igalia.wolvic.ui.views.settings.RadioGroupSetting;
 import com.igalia.wolvic.ui.views.settings.SwitchSetting;
 import com.igalia.wolvic.ui.widgets.WidgetManagerDelegate;
 import com.igalia.wolvic.ui.widgets.WidgetPlacement;
+import com.igalia.wolvic.utils.DeviceType;
 
 class ControllerOptionsView extends SettingsView {
 
@@ -81,6 +82,10 @@ class ControllerOptionsView extends SettingsView {
 
         if (mWidgetManager.isHandTrackingSupported() && mWidgetManager.areControllersAvailable()) {
             setHandTrackingEnabled(mWidgetManager.isHandTrackingEnabled(), false);
+            if (DeviceType.isWaveBuild()) {
+                mBinding.handtrackingAutoSwitch.setVisibility(VISIBLE);
+                setHandInputAutoSwitch(mWidgetManager.isHandInputAutoSwitchEnabled(), false);
+            }
         } else {
             mBinding.handtrackingSwitch.setVisibility(GONE);
         }
@@ -100,6 +105,9 @@ class ControllerOptionsView extends SettingsView {
         setHapticFeedbackEnabled(SettingsStore.HAPTIC_FEEDBACK_ENABLED, true);
         setPointerMode(SettingsStore.POINTER_MODE_DEFAULT, true);
         setHandTrackingEnabled(true, true);
+        if (DeviceType.isWaveBuild() && mBinding.handtrackingAutoSwitch.getVisibility() == VISIBLE) {
+            setHandInputAutoSwitch(SettingsStore.HAND_INPUT_AUTO_SWITCH_DEFAULT, true);
+        }
     }
 
     private void setWindowSelectionMethod(int checkedId, boolean doApply) {
@@ -200,6 +208,16 @@ class ControllerOptionsView extends SettingsView {
         }
     }
 
+    private void setHandInputAutoSwitch(boolean value, boolean doApply) {
+        mBinding.handtrackingAutoSwitch.setOnCheckedChangeListener(null);
+        mBinding.handtrackingAutoSwitch.setValue(value, false);
+        mBinding.handtrackingAutoSwitch.setOnCheckedChangeListener(mHandInputAutoSwitchListener);
+
+        if (doApply) {
+            mWidgetManager.setHandInputAutoSwitchEnabled(value);
+        }
+    }
+
     private RadioGroupSetting.OnCheckedChangeListener mWindowSelectionMethodListener = (radioGroup, checkedId, doApply) -> {
         setWindowSelectionMethod(checkedId, doApply);
     };
@@ -237,6 +255,9 @@ class ControllerOptionsView extends SettingsView {
 
     private SwitchSetting.OnCheckedChangeListener mHandtrackingListener = (compoundButton, enabled, apply) ->
             setHandTrackingEnabled(enabled, true);
+
+    private SwitchSetting.OnCheckedChangeListener mHandInputAutoSwitchListener = (compoundButton, enabled, apply) ->
+            setHandInputAutoSwitch(enabled, true);
 
     @Override
     public Point getDimensions() {

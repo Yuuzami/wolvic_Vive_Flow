@@ -40,6 +40,7 @@ void CheckTogglePassthrough();
 void ResetWindowsPosition();
 std::string GetActiveEnvironment();
 int32_t GetPointerColor();
+int32_t GetRenderScalePercent();
 bool AreLayersEnabled();
 void SetDeviceType(const jint aType);
 void HaltActivity(const jint aReason);

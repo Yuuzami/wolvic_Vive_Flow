@@ -72,6 +72,13 @@
                     android:layout_height="wrap_content"
                     app:description="@string/controller_options_handtracking" />
 
+                <com.igalia.wolvic.ui.views.settings.SwitchSetting
+                    android:id="@+id/handtracking_auto_switch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:visibility="gone"
+                    app:description="@string/controller_options_handtracking_auto_switch" />
+
                 <RelativeLayout
                     android:id="@+id/handtracking_switch_warning"
                     android:layout_width="match_parent"

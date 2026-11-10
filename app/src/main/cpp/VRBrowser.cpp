@@ -52,6 +52,8 @@ const char* const kGetActiveEnvironment = "getActiveEnvironment";
 const char* const kGetActiveEnvironmentSignature = "()Ljava/lang/String;";
 const char* const kGetPointerColor = "getPointerColor";
 const char* const kGetPointerColorSignature = "()I";
+const char* const kGetRenderScalePercent = "getRenderScalePercent";
+const char* const kGetRenderScalePercentSignature = "()I";
 const char* const kSetDeviceType = "setDeviceType";
 const char* const kSetDeviceTypeSignature = "(I)V";
 const char* const kHaltActivity = "haltActivity";
@@ -103,6 +105,7 @@ jmethodID sCheckTogglePassthrough = nullptr;
 jmethodID sResetWindowsPosition = nullptr;
 jmethodID sGetActiveEnvironment = nullptr;
 jmethodID sGetPointerColor = nullptr;
+jmethodID sGetRenderScalePercent = nullptr;
 jmethodID sSetDeviceType = nullptr;
 jmethodID sHaltActivity = nullptr;
 jmethodID sHandlePoorPerformance = nullptr;
@@ -157,6 +160,7 @@ VRBrowser::InitializeJava(JNIEnv* aEnv, jobject aActivity) {
   sResetWindowsPosition = FindJNIMethodID(sEnv, sBrowserClass, kResetWindowsPosition, kResetWindowsPositionSignature);
   sGetActiveEnvironment = FindJNIMethodID(sEnv, sBrowserClass, kGetActiveEnvironment, kGetActiveEnvironmentSignature);
   sGetPointerColor = FindJNIMethodID(sEnv, sBrowserClass, kGetPointerColor, kGetPointerColorSignature);
+  sGetRenderScalePercent = FindJNIMethodID(sEnv, sBrowserClass, kGetRenderScalePercent, kGetRenderScalePercentSignature);
   sSetDeviceType = FindJNIMethodID(sEnv, sBrowserClass, kSetDeviceType, kSetDeviceTypeSignature);
   sHaltActivity = FindJNIMethodID(sEnv, sBrowserClass, kHaltActivity, kHaltActivitySignature);
   sHandlePoorPerformance = FindJNIMethodID(sEnv, sBrowserClass, kHandlePoorPerformance, kHandlePoorPerformanceSignature);
@@ -211,6 +215,7 @@ VRBrowser::ShutdownJava() {
   sResetWindowsPosition = nullptr;
   sGetActiveEnvironment = nullptr;
   sGetPointerColor = nullptr;
+  sGetRenderScalePercent = nullptr;
   sSetDeviceType = nullptr;
   sHaltActivity = nullptr;
   sOnAppLink = nullptr;
@@ -406,6 +411,15 @@ VRBrowser::GetPointerColor() {
   CheckJNIException(sEnv, __FUNCTION__);
 
   return (int32_t )jHexColor;
+}
+
+int32_t
+VRBrowser::GetRenderScalePercent() {
+  if (!ValidateMethodID(sEnv, sActivity, sGetRenderScalePercent, __FUNCTION__)) { return 90; }
+  jint jPercent = (jint) sEnv->CallIntMethod(sActivity, sGetRenderScalePercent);
+  CheckJNIException(sEnv, __FUNCTION__);
+
+  return (int32_t) jPercent;
 }
 
 void

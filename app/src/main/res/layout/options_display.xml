@@ -134,6 +134,15 @@
                     app:highlightedTextColor="@color/fog" />
 
                 <com.igalia.wolvic.ui.views.settings.RadioGroupSetting
+                    android:id="@+id/render_scale_radio"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:visibility="gone"
+                    app:description="@string/display_options_render_scale"
+                    app:options="@array/display_options_render_scale"
+                    app:values="@array/display_options_render_scale_values" />
+
+                <com.igalia.wolvic.ui.views.settings.RadioGroupSetting
                     android:id="@+id/ua_radio"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"

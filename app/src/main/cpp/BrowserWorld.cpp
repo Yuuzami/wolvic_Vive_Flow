@@ -1840,6 +1840,27 @@ BrowserWorld::SetHandTrackingEnabled(bool value) {
     m.device->SetHandTrackingEnabled(value);
 }
 
+void
+BrowserWorld::SetHandInputAutoSwitch(bool value) {
+    if (m.device) {
+        m.device->SetHandInputAutoSwitch(value);
+    }
+}
+
+void
+BrowserWorld::SetManualHandInput(bool useHands) {
+    if (m.device) {
+        m.device->SetManualHandInput(useHands);
+    }
+}
+
+void
+BrowserWorld::SetRenderScale(int percent) {
+    if (m.device) {
+        m.device->SetRenderScale(percent);
+    }
+}
+
 JNIEnv*
 BrowserWorld::GetJNIEnv() const {
   ASSERT_ON_RENDER_THREAD(nullptr);
@@ -2354,6 +2375,21 @@ JNI_METHOD(void, setPointerModeNative)
 JNI_METHOD(void, setHandTrackingEnabledNative)
 (JNIEnv*, jobject, jboolean value) {
     crow::BrowserWorld::Instance().SetHandTrackingEnabled(value);
+}
+
+JNI_METHOD(void, setHandInputAutoSwitchNative)
+(JNIEnv*, jobject, jboolean value) {
+    crow::BrowserWorld::Instance().SetHandInputAutoSwitch(value);
+}
+
+JNI_METHOD(void, setManualHandInputNative)
+(JNIEnv*, jobject, jboolean useHands) {
+    crow::BrowserWorld::Instance().SetManualHandInput(useHands);
+}
+
+JNI_METHOD(void, setRenderScaleNative)
+(JNIEnv*, jobject, jint percent) {
+    crow::BrowserWorld::Instance().SetRenderScale(percent);
 }
 
 } // extern "C"

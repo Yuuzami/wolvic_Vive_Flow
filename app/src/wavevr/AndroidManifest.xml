@@ -3,6 +3,8 @@
     xmlns:tools="http://schemas.android.com/tools">
     <!-- GeckoView takes a wake lock when video plays; without the permission the SecurityException crashes Gecko. -->
     <uses-permission android:name="android.permission.WAKE_LOCK" tools:node="replace"/>
+    <!-- The Wave runtime only starts hand tracking (and switches to it) for apps that declare it. -->
+    <uses-feature android:name="wave.feature.handtracking" android:required="true" />
 
     <application  tools:replace="android:theme" android:theme="@style/FxR.Dark" tools:remove="android:roundIcon">
         <activity android:name=".VRBrowserActivity"

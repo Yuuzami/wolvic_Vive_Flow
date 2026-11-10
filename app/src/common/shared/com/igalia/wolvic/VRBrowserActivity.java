@@ -256,6 +256,7 @@ public class VRBrowserActivity extends PlatformActivity implements WidgetManager
     private Media mPrevActiveMedia = null;
     private boolean mIsPassthroughEnabled = false;
     private boolean mIsHandTrackingEnabled = true;
+    private boolean mIsManualHandInput = false;
     private boolean mIsHandTrackingSupported = false;
     private boolean mAreControllersAvailable = false;
     private long mLastBatteryUpdate = System.nanoTime();
@@ -484,6 +485,7 @@ public class VRBrowserActivity extends PlatformActivity implements WidgetManager
         mTray = new TrayWidget(this);
         mTray.addListeners(mWindows);
         mTray.setAddWindowVisible(mWindows.canOpenNewWindow());
+        updateHandInputButton();
 
         // Create Tabs bar widget
         if (mSettings.getTabsLocation() == SettingsStore.TABS_LOCATION_HORIZONTAL) {
@@ -1436,6 +1438,12 @@ public class VRBrowserActivity extends PlatformActivity implements WidgetManager
         return SettingsStore.getInstance(this).getPointerColor();
     }
 
+    @Keep
+    @SuppressWarnings("unused")
+    public int getRenderScalePercent() {
+        return SettingsStore.getInstance(this).getRenderScalePercent();
+    }
+
     private void setUseHardwareAcceleration() {
         UISurfaceTextureRenderer.setUseHardwareAcceleration(SettingsStore.getInstance(getBaseContext()).isUIHardwareAccelerationEnabled());
     }
@@ -1576,6 +1584,12 @@ public class VRBrowserActivity extends PlatformActivity implements WidgetManager
     @SuppressWarnings("unused")
     private void setHandTrackingSupported(final boolean isSupported) {
         mIsHandTrackingSupported = isSupported;
+        if (isSupported) {
+            // Called on the render thread once the device exists: push the stored input mode settings.
+            setHandInputAutoSwitchNative(SettingsStore.getInstance(this).isHandInputAutoSwitchEnabled());
+            setManualHandInputNative(mIsManualHandInput);
+        }
+        updateHandInputButton();
     }
 
     @Keep
@@ -2166,6 +2180,52 @@ public class VRBrowserActivity extends PlatformActivity implements WidgetManager
     public void setHandTrackingEnabled(boolean value) {
         mIsHandTrackingEnabled = value;
         queueRunnable(() -> setHandTrackingEnabledNative(value));
+        updateHandInputButton();
+    }
+
+    @Override
+    public void setHandInputAutoSwitchEnabled(boolean value) {
+        SettingsStore.getInstance(this).setHandInputAutoSwitchEnabled(value);
+        // Leaving auto mode starts on the controller.
+        mIsManualHandInput = false;
+        queueRunnable(() -> {
+            setHandInputAutoSwitchNative(value);
+            setManualHandInputNative(false);
+        });
+        updateHandInputButton();
+    }
+
+    @Override
+    public boolean isHandInputAutoSwitchEnabled() {
+        return SettingsStore.getInstance(this).isHandInputAutoSwitchEnabled();
+    }
+
+    @Override
+    public void setManualHandInput(boolean useHands) {
+        mIsManualHandInput = useHands;
+        queueRunnable(() -> setManualHandInputNative(useHands));
+        updateHandInputButton();
+    }
+
+    @Override
+    public boolean isManualHandInput() {
+        return mIsManualHandInput;
+    }
+
+    @Override
+    public void setRenderScale(int percent) {
+        queueRunnable(() -> setRenderScaleNative(percent));
+    }
+
+    private void updateHandInputButton() {
+        final boolean visible = DeviceType.isWaveBuild() && mIsHandTrackingSupported &&
+                mIsHandTrackingEnabled && !isHandInputAutoSwitchEnabled();
+        final boolean usingHands = mIsManualHandInput;
+        runOnUiThread(() -> {
+            if (mTray != null) {
+                mTray.setHandInputButtonState(visible, usingHands);
+            }
+        });
     }
 
     @Override
@@ -2301,5 +2361,8 @@ public class VRBrowserActivity extends PlatformActivity implements WidgetManager
     private native void setIsServo(boolean aIsServo);
     private native void setPointerModeNative(@PointerMode int aMode);
     private native void setHandTrackingEnabledNative(boolean value);
+    private native void setHandInputAutoSwitchNative(boolean value);
+    private native void setManualHandInputNative(boolean useHands);
+    private native void setRenderScaleNative(int percent);
 
 }

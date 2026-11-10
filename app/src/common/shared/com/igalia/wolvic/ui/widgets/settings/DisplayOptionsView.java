@@ -19,6 +19,7 @@ import com.igalia.wolvic.ui.views.settings.RadioGroupSetting;
 import com.igalia.wolvic.ui.views.settings.SwitchSetting;
 import com.igalia.wolvic.ui.widgets.WidgetManagerDelegate;
 import com.igalia.wolvic.ui.widgets.WidgetPlacement;
+import com.igalia.wolvic.utils.DeviceType;
 import com.igalia.wolvic.utils.UrlUtils;
 
 import java.util.Objects;
@@ -71,6 +72,13 @@ class DisplayOptionsView extends SettingsView {
         int msaaLevel = SettingsStore.getInstance(getContext()).getMSAALevel();
         mBinding.msaaRadio.setOnCheckedChangeListener(mMSSAChangeListener);
         setMSAAMode(mBinding.msaaRadio.getIdForValue(msaaLevel), false);
+
+        if (DeviceType.isWaveBuild()) {
+            mBinding.renderScaleRadio.setVisibility(View.VISIBLE);
+            int renderScale = SettingsStore.getInstance(getContext()).getRenderScalePercent();
+            mBinding.renderScaleRadio.setOnCheckedChangeListener(mRenderScaleChangeListener);
+            setRenderScale(mBinding.renderScaleRadio.getIdForValue(renderScale), false);
+        }
 
         List<String> windowSizePresets = new ArrayList<>();
         for (SettingsStore.WindowSizePreset preset : SettingsStore.WindowSizePreset.values()) {
@@ -177,6 +185,10 @@ class DisplayOptionsView extends SettingsView {
         setMSAAMode(checkedId, true);
     };
 
+    private RadioGroupSetting.OnCheckedChangeListener mRenderScaleChangeListener = (radioGroup, checkedId, doApply) -> {
+        setRenderScale(checkedId, true);
+    };
+
     private RadioGroupSetting.OnCheckedChangeListener mWindowsSizeChangeListener = (radioGroup, checkedId, doApply) -> {
         setWindowsSizePreset(checkedId, true);
     };
@@ -274,6 +286,11 @@ class DisplayOptionsView extends SettingsView {
 
         if (mBinding.windowsSize.getCheckedRadioButtonId() != SettingsStore.WINDOW_SIZE_PRESET_DEFAULT.ordinal()) {
             setWindowsSizePreset(SettingsStore.WINDOW_SIZE_PRESET_DEFAULT.ordinal(), true);
+        }
+
+        if (DeviceType.isWaveBuild() &&
+                !mBinding.renderScaleRadio.getValueForId(mBinding.renderScaleRadio.getCheckedRadioButtonId()).equals(SettingsStore.RENDER_SCALE_DEFAULT)) {
+            setRenderScale(mBinding.renderScaleRadio.getIdForValue(SettingsStore.RENDER_SCALE_DEFAULT), true);
         }
         
         int defaultHomepageId = getHomepageId(mDefaultHomepageUrl);
@@ -445,6 +462,18 @@ class DisplayOptionsView extends SettingsView {
         if (doApply) {
             SettingsStore.getInstance(getContext()).setMSAALevel((Integer)mBinding.msaaRadio.getValueForId(checkedId));
             showRestartDialog(() -> {setMSAAMode(previouslyCheckedMSAAId, true);});
+        }
+    }
+
+    private void setRenderScale(int checkedId, boolean doApply) {
+        mBinding.renderScaleRadio.setOnCheckedChangeListener(null);
+        mBinding.renderScaleRadio.setChecked(checkedId, false);
+        mBinding.renderScaleRadio.setOnCheckedChangeListener(mRenderScaleChangeListener);
+
+        if (doApply) {
+            int percent = (Integer) mBinding.renderScaleRadio.getValueForId(checkedId);
+            SettingsStore.getInstance(getContext()).setRenderScalePercent(percent);
+            mWidgetManager.setRenderScale(percent);
         }
     }
 

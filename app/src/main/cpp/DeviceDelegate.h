@@ -139,6 +139,10 @@ public:
   virtual void SetImmersiveBlendMode(device::BlendMode) {};
   virtual bool PopulateTrackedKeyboardInfo(TrackedKeyboardInfo& keyboardInfo) { return false; };
   virtual void SetHandTrackingEnabled(bool value) {};
+  // Only used by devices where hand tracking and a controller can both drive input.
+  virtual void SetHandInputAutoSwitch(bool value) {};
+  virtual void SetManualHandInput(bool useHands) {};
+  virtual void SetRenderScale(int percent) {};
   virtual float GetSelectThreshold(int32_t controllerIndex) { return 1.f; };
   virtual unsigned MaxCompositionLayers() const { return 1; }
 

@@ -1855,7 +1855,12 @@ public class Session implements WContentBlocking.Delegate, WSession.NavigationDe
         surfaceDestroyed();
         if (mState.mDisplay != null) {
             if (mState.mSession != null) {
-                mState.mSession.releaseDisplay(mState.mDisplay);
+                try {
+                    mState.mSession.releaseDisplay(mState.mDisplay);
+                } catch (IllegalArgumentException e) {
+                    // The display belongs to a session that was recreated (e.g. after a content process kill).
+                    Log.w(LOGTAG, "Display was already detached: " + e.getMessage());
+                }
             }
             mState.mDisplay = null;
         }

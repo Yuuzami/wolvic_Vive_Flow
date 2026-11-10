@@ -7,6 +7,9 @@
 #include "DeviceUtils.h"
 #include "ElbowModel.h"
 #include "GestureDelegate.h"
+#include "HandMeshRenderer.h"
+#include "VRBrowser.h"
+#include "WaveHandTracking.h"
 
 #include "vrb/CameraEye.h"
 #include "vrb/Color.h"
@@ -92,6 +95,9 @@ struct DeviceDelegateWaveVR::State {
   vrb::CameraEyePtr cameras[2];
   uint32_t renderWidth;
   uint32_t renderHeight;
+  // The recommended eye size is the 0.9x preset of the 1600px panel.
+  static const int kRecommendedScalePercent = 90;
+  int renderScalePercent = kRecommendedScalePercent;
 
   WVR_DevicePosePair_t devicePairs[WVR_DEVICE_COUNT_LEVEL_1];
   ElbowModelPtr elbow;
@@ -109,6 +115,16 @@ struct DeviceDelegateWaveVR::State {
   WVR_CtrlerModel_t * modelCachedData[2];
   bool isModelDataReady[2];
   std::mutex mCachedDataMutex[2];
+  // Hand controllers use indices kMaxControllerCount + hand (0 = right, 1 = left).
+  WaveHandTracking handTracking;
+  HandMeshRendererPtr handMeshRenderer;
+  bool handTrackingEnabled = true;
+  bool handInputAutoSwitch = true;
+  bool manualHandInput = false;
+  bool usingHands = false;
+  bool suspended = false;
+  std::array<bool, 2> handEnabled {};
+  std::array<bool, 2> handSelect {};
   State()
       : isRunning(true)
       , near(0.1f)
@@ -231,8 +247,15 @@ struct DeviceDelegateWaveVR::State {
     elbow = ElbowModel::Create();
   }
 
+  void ApplyRenderScale(uint32_t& aWidth, uint32_t& aHeight) const {
+    aWidth = aWidth * renderScalePercent / kRecommendedScalePercent;
+    aHeight = aHeight * renderScalePercent / kRecommendedScalePercent;
+  }
+
   void InitializeRender() {
+    renderScalePercent = VRBrowser::GetRenderScalePercent();
     WVR_GetRenderTargetSize(&renderWidth, &renderHeight);
+    ApplyRenderScale(renderWidth, renderHeight);
     VRB_GL_CHECK(glViewport(0, 0, renderWidth, renderHeight));
     VRB_LOG("Recommended size is %ux%u", renderWidth, renderHeight);
     if (renderWidth == 0 || renderHeight == 0) {
@@ -268,6 +291,7 @@ struct DeviceDelegateWaveVR::State {
   }
 
   void Shutdown() {
+    handTracking.Stop();
     ReleaseTextureQueues();
   }
 
@@ -317,21 +341,121 @@ struct DeviceDelegateWaveVR::State {
     aController.enabled = false;
   }
 
+  void UpdateHands(const vrb::Matrix& head) {
+    if (!delegate) {
+      return;
+    }
+    // Keep tracking running whenever hands are available: the system only hands input over to hands
+    // for apps with an active hand tracker, even while a controller is the active input.
+    const bool tracking = handTrackingEnabled && !suspended;
+    const bool gotData = handTracking.Update(tracking, !WVR_IsInputFocusCapturedBySystem());
+    for (int hand = 0; hand < 2; ++hand) {
+      const int index = kMaxControllerCount + hand;
+      const bool valid = usingHands && gotData && handTracking.Valid(hand);
+      if (!valid) {
+        if (handEnabled[hand]) {
+          // Release any pinch so a drag cannot stay held, then hide the input source.
+          delegate->SetButtonState(index, ControllerDelegate::BUTTON_TRIGGER, device::kImmersiveButtonTrigger, false, false, 0.0f);
+          if (handSelect[hand]) {
+            delegate->SetSelectActionStop(index);
+          }
+          delegate->SetEnabled(index, false);
+          VRB_LOG("Wave hand %d tracking lost", hand);
+        }
+        handEnabled[hand] = false;
+        handSelect[hand] = false;
+        continue;
+      }
+      if (!handEnabled[hand]) {
+        delegate->SetEnabled(index, true);
+        VRB_LOG("Wave hand %d tracking active", hand);
+      }
+      handEnabled[hand] = true;
+
+      std::vector<vrb::Matrix> joints(WaveHandTracking::kJointCount);
+      std::vector<float> radii(WaveHandTracking::kJointCount, 0.008f);
+      for (int joint = 0; joint < WaveHandTracking::kJointCount; ++joint) {
+        const WVR_Pose_t& p = handTracking.Joint(hand, joint);
+        joints[joint] = handTracking.HasRotation(joint)
+            ? vrb::Matrix::Rotation(vrb::Quaternion(p.rotation.x, p.rotation.y, p.rotation.z, p.rotation.w).Normalize())
+            : vrb::Matrix::Identity();
+        vrb::Vector position(p.position.v[0], p.position.v[1], p.position.v[2]);
+        if (renderMode == device::RenderMode::StandAlone) {
+          position += kAverageHeight;
+        }
+        joints[joint].TranslateInPlace(position);
+      }
+
+      const WVR_HandPoseState_t& pose = handTracking.Pose(hand);
+      bool hasAim = pose.base.type == WVR_HandPoseType_Pinch;
+      vrb::Matrix aim = vrb::Matrix::Identity();
+      if (hasAim) {
+        const vrb::Vector ray(pose.pinch.direction.v[0], pose.pinch.direction.v[1], pose.pinch.direction.v[2]);
+        const WVR_Vector3f_t& origin = pose.pinch.origin;
+        hasAim = std::isfinite(ray.x()) && std::isfinite(ray.y()) && std::isfinite(ray.z()) &&
+                 ray.Magnitude() > 0.001f && std::isfinite(origin.v[0]) &&
+                 std::isfinite(origin.v[1]) && std::isfinite(origin.v[2]);
+        if (hasAim) {
+          // Wolvic's pointer ray travels along local -Z, Wave supplies the forward direction.
+          const vrb::Vector up = std::fabs(ray.Normalize().y()) > 0.95f ? vrb::Vector(0.0f, 0.0f, 1.0f) : vrb::Vector(0.0f, 1.0f, 0.0f);
+          aim = vrb::Matrix::Rotation(-ray, up);
+          vrb::Vector position(origin.v[0], origin.v[1], origin.v[2]);
+          if (renderMode == device::RenderMode::StandAlone) {
+            position += kAverageHeight;
+          }
+          aim.TranslateInPlace(position);
+        }
+      }
+
+      const float strength = handTracking.Strength(hand);
+      const bool trigger = handTracking.Pinched(hand) && hasAim;
+      delegate->SetMode(index, ControllerMode::Hand);
+      delegate->SetAimEnabled(index, hasAim);
+      delegate->SetHandJointLocations(index, std::move(joints), std::move(radii));
+      delegate->SetSelectFactor(index, strength);
+      delegate->SetButtonState(index, ControllerDelegate::BUTTON_TRIGGER, device::kImmersiveButtonTrigger,
+                               trigger, strength > 0.0f, strength);
+      if (trigger != handSelect[hand] && renderMode == device::RenderMode::Immersive) {
+        if (trigger) {
+          delegate->SetSelectActionStart(index);
+        } else {
+          delegate->SetSelectActionStop(index);
+        }
+      }
+      handSelect[hand] = trigger;
+      if (hasAim) {
+        delegate->SetTransform(index, aim);
+        delegate->SetBeamTransform(index, vrb::Matrix::Identity());
+        delegate->SetImmersiveBeamTransform(index, vrb::Matrix::Identity());
+      }
+    }
+  }
+
   void UpdateControllers() {
     if (!delegate) {
       return;
     }
 
+    // Hands are used when tracking is enabled and either no controller is connected (so input never
+    // dies), or the system mode / the manual toggle selects hands.
+    const bool noController = !WVR_IsDeviceConnected(WVR_DeviceType_Controller_Right) &&
+                              !WVR_IsDeviceConnected(WVR_DeviceType_Controller_Left);
+    const bool wantHands = handInputAutoSwitch ? WVR_GetInteractionMode() == WVR_InteractionMode_Hand
+                                               : manualHandInput;
+    usingHands = handTrackingEnabled && (noController || wantHands);
+
     static uint32_t sDiagCounter = 0;
     if ((sDiagCounter++ % 180) == 0) {
-      VRB_LOG("[WaveVRInput] focusCapturedBySystem=%d interactionMode=%d", WVR_IsInputFocusCapturedBySystem(), WVR_GetInteractionMode());
+      VRB_LOG("[WaveVRInput] focusCapturedBySystem=%d interactionMode=%d usingHands=%d handTrackingEnabled=%d handDevicesConnected(R=%d L=%d)",
+              WVR_IsInputFocusCapturedBySystem(), WVR_GetInteractionMode(), usingHands, handTrackingEnabled,
+              WVR_IsDeviceConnected(WVR_DeviceType_NaturalHand_Right), WVR_IsDeviceConnected(WVR_DeviceType_NaturalHand_Left));
       for (Controller& c: controllers) {
         VRB_LOG("[WaveVRInput] controller %d type=%d connected=%d dof6=%d created=%d enabled=%d", c.index, c.type,
                 WVR_IsDeviceConnected(c.type), c.is6DoF, c.created, c.enabled);
       }
     }
 
-    if (WVR_IsInputFocusCapturedBySystem()) {
+    if (usingHands || WVR_IsInputFocusCapturedBySystem()) {
       for (Controller& controller: controllers) {
         if (controller.enabled) {
           delegate->SetEnabled(controller.index, false);
@@ -561,6 +685,65 @@ DeviceDelegateWaveVR::Create(vrb::RenderContextPtr& aContext) {
 
 void DeviceDelegateWaveVR::InitializeRender() {
   m.InitializeRender();
+  const bool handsSupported = m.handTracking.Initialize();
+  VRBrowser::SetHandTrackingSupported(handsSupported);
+  // The settings UI gates the controller options on this; Wave devices always ship a controller.
+  VRBrowser::OnControllersAvailable();
+  VRB_LOG("Wave natural hand tracking supported=%d", handsSupported);
+}
+
+int32_t
+DeviceDelegateWaveVR::GetHandTrackingJointIndex(const HandTrackingJoints aJoint) {
+  // WVR_HandJoint follows the same order as HandTrackingJoints.
+  return static_cast<int32_t>(aJoint);
+}
+
+void
+DeviceDelegateWaveVR::UpdateHandMesh(const uint32_t aControllerIndex, const std::vector<vrb::Matrix>& handJointTransforms,
+                                     const vrb::GroupPtr& aRoot, const bool aEnabled, const bool leftHanded) {
+  if (aControllerIndex < kMaxControllerCount || handJointTransforms.size() != WaveHandTracking::kJointCount) {
+    return;
+  }
+  if (!m.handMeshRenderer) {
+    vrb::RenderContextPtr context = m.context.lock();
+    if (!context) {
+      return;
+    }
+    vrb::CreationContextPtr create = context->GetRenderThreadCreationContext();
+    m.handMeshRenderer = HandMeshRendererSkinned::Create(create);
+  }
+  HandMeshBufferPtr buffer;
+  m.handMeshRenderer->Update(aControllerIndex, handJointTransforms, aRoot, buffer, aEnabled, leftHanded);
+}
+
+void
+DeviceDelegateWaveVR::DrawHandMesh(const uint32_t aControllerIndex, const vrb::Camera& aCamera) {
+  if (m.handMeshRenderer && aControllerIndex >= kMaxControllerCount) {
+    m.handMeshRenderer->Draw(aControllerIndex, aCamera);
+  }
+}
+
+void
+DeviceDelegateWaveVR::SetHandTrackingEnabled(bool aValue) {
+  m.handTrackingEnabled = aValue;
+  if (!aValue) {
+    m.handTracking.Stop();
+  }
+}
+
+void
+DeviceDelegateWaveVR::SetHandInputAutoSwitch(bool aValue) {
+  m.handInputAutoSwitch = aValue;
+}
+
+void
+DeviceDelegateWaveVR::SetManualHandInput(bool aUseHands) {
+  m.manualHandInput = aUseHands;
+}
+
+float
+DeviceDelegateWaveVR::GetSelectThreshold(int32_t aControllerIndex) {
+  return aControllerIndex >= kMaxControllerCount ? 0.7f : 1.0f;
 }
 
 device::DeviceType
@@ -583,9 +766,32 @@ DeviceDelegateWaveVR::SetRenderMode(const device::RenderMode aMode) {
 
   uint32_t recommendedWidth, recommendedHeight;
   WVR_GetRenderTargetSize(&recommendedWidth, &recommendedHeight);
+  if (aMode == device::RenderMode::StandAlone) {
+    m.ApplyRenderScale(recommendedWidth, recommendedHeight);
+  }
   if (recommendedWidth != m.renderWidth || recommendedHeight != m.renderHeight) {
     m.renderWidth = recommendedWidth;
     m.renderHeight = recommendedHeight;
+    m.InitializeTextureQueues();
+  }
+}
+
+void
+DeviceDelegateWaveVR::SetRenderScale(int aPercent) {
+  aPercent = std::max(50, std::min(150, aPercent));
+  if (aPercent == m.renderScalePercent) {
+    return;
+  }
+  m.renderScalePercent = aPercent;
+  if (m.renderMode != device::RenderMode::StandAlone) {
+    return;
+  }
+  uint32_t width, height;
+  WVR_GetRenderTargetSize(&width, &height);
+  m.ApplyRenderScale(width, height);
+  if (width != m.renderWidth || height != m.renderHeight) {
+    m.renderWidth = width;
+    m.renderHeight = height;
     m.InitializeTextureQueues();
   }
 }
@@ -700,6 +906,17 @@ DeviceDelegateWaveVR::SetControllerDelegate(ControllerDelegatePtr& aController) 
     VRB_LOG("Creating controller from SetControllerDelegate");
     m.CreateController(controller);
   }
+  for (int hand = 0; hand < 2; ++hand) {
+    const int index = kMaxControllerCount + hand;
+    m.delegate->CreateController(index, 0, "HTC Vive Hand", vrb::Matrix::Identity());
+    m.delegate->SetLeftHanded(index, hand == 1);
+    m.delegate->SetCapabilityFlags(index, device::Orientation | device::Position | device::GripSpacePosition);
+    m.delegate->SetControllerType(index, device::ViveFocus);
+    m.delegate->SetTargetRayMode(index, device::TargetRayMode::TrackedPointer);
+    m.delegate->SetButtonCount(index, 1);
+    m.delegate->SetHapticCount(index, 0);
+    m.delegate->SetEnabled(index, false);
+  }
 }
 
 void
@@ -764,12 +981,15 @@ DeviceDelegateWaveVR::ProcessEvents() {
         VRB_WAVE_EVENT_LOG("WVR_EventType_DeviceSuspend");
         m.reorientMatrix = vrb::Matrix::Identity();
         m.ignoreNextRecenter = true;
+        m.suspended = true;
+        m.handTracking.Stop();
       }
         break;
       case WVR_EventType_DeviceResume: {
         VRB_WAVE_EVENT_LOG("WVR_EventType_DeviceResume");
         m.reorientMatrix = vrb::Matrix::Identity();
         m.UpdateBoundary();
+        m.suspended = false;
       }
         break;
       case WVR_EventType_DeviceRoleChanged: {
@@ -971,6 +1191,7 @@ DeviceDelegateWaveVR::StartFrame(const FramePrediction aPrediction) {
       }
     }
   }
+  m.UpdateHands(hmd);
   mShouldRender = true;
 }
 

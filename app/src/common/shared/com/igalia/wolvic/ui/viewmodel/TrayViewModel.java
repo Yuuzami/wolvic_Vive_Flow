@@ -31,7 +31,8 @@ public class TrayViewModel extends AndroidViewModel {
     private MutableLiveData<ObservableInt> rightControllerIcon;
     private MutableLiveData<ObservableInt> rightControllerBatteryLevel;
     private MutableLiveData<ObservableBoolean> settingsWidgetVisible;
-
+    private MutableLiveData<ObservableBoolean> handInputButtonVisible;
+    private MutableLiveData<ObservableBoolean> handInputActive;
     public TrayViewModel(@NonNull Application application) {
         super(application);
 
@@ -55,6 +56,8 @@ public class TrayViewModel extends AndroidViewModel {
         rightControllerIcon = new MutableLiveData<>(new ObservableInt(R.drawable.ic_icon_statusbar_controller_generic));
         rightControllerBatteryLevel = new MutableLiveData<>(new ObservableInt(R.drawable.ic_icon_statusbar_indicator));
         settingsWidgetVisible = new MutableLiveData<>(new ObservableBoolean(false));
+        handInputButtonVisible = new MutableLiveData<>(new ObservableBoolean(false));
+        handInputActive = new MutableLiveData<>(new ObservableBoolean(false));
     }
 
     Observer<ObservableBoolean> mIsVisibleObserver = new Observer<ObservableBoolean>() {
@@ -83,6 +86,8 @@ public class TrayViewModel extends AndroidViewModel {
         rightControllerIcon.setValue(rightControllerIcon.getValue());
         rightControllerBatteryLevel.setValue(rightControllerBatteryLevel.getValue());
         settingsWidgetVisible.postValue(settingsWidgetVisible.getValue());
+        handInputButtonVisible.postValue(handInputButtonVisible.getValue());
+        handInputActive.postValue(handInputActive.getValue());
     }
 
     public void setIsMaxWindows(boolean isMaxWindows) {
@@ -210,5 +215,14 @@ public class TrayViewModel extends AndroidViewModel {
 
     public void setSettingsWidgetVisible(boolean visible) {
         settingsWidgetVisible.setValue(new ObservableBoolean(visible));
+    }
+
+    public MutableLiveData<ObservableBoolean> getHandInputButtonVisible() { return handInputButtonVisible; }
+
+    public MutableLiveData<ObservableBoolean> getHandInputActive() { return handInputActive; }
+
+    public void setHandInputButtonState(boolean visible, boolean usingHands) {
+        handInputButtonVisible.setValue(new ObservableBoolean(visible));
+        handInputActive.setValue(new ObservableBoolean(usingHands));
     }
 }

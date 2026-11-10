@@ -233,6 +233,17 @@
             </RelativeLayout>
 
             <com.igalia.wolvic.ui.views.UIButton
+                android:id="@+id/handInputButton"
+                style="@style/trayButtonMiddleTheme"
+                android:tooltipText="@{traymodel.handInputActive ? @string/hand_input_use_controller_tooltip : @string/hand_input_use_hands_tooltip}"
+                app:tooltipDensity="@dimen/tray_tooltip_density"
+                app:tooltipPosition="bottom"
+                app:tooltipLayout="@layout/tooltip_tray"
+                android:src="@drawable/ic_icon_tray_hand"
+                app:activeMode="@{traymodel.handInputActive}"
+                app:visibleGone="@{traymodel.handInputButtonVisible}"/>
+
+            <com.igalia.wolvic.ui.views.UIButton
                 android:id="@+id/settingsButton"
                 style="@style/trayButtonEndTheme"
                 android:tooltipText="@string/settings_tooltip"

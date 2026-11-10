@@ -37,6 +37,15 @@ public:
   void BindEye(const device::Eye aWhich) override;
   void EndFrame(const FrameEndMode aMode) override;
   vrb::LoadTask GetControllerModelTask(int32_t index) override;
+  int32_t GetHandTrackingJointIndex(const HandTrackingJoints aJoint) override;
+  void UpdateHandMesh(const uint32_t aControllerIndex, const std::vector<vrb::Matrix>& handJointTransforms,
+                      const vrb::GroupPtr& aRoot, const bool aEnabled, const bool leftHanded) override;
+  void DrawHandMesh(const uint32_t aControllerIndex, const vrb::Camera&) override;
+  void SetHandTrackingEnabled(bool aValue) override;
+  void SetHandInputAutoSwitch(bool aValue) override;
+  void SetManualHandInput(bool aUseHands) override;
+  void SetRenderScale(int aPercent) override;
+  float GetSelectThreshold(int32_t aControllerIndex) override;
   // DeviceDelegateWaveVR interface
   bool IsRunning();
 protected:

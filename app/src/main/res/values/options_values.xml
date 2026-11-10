@@ -85,6 +85,21 @@
         <item>2</item>
     </integer-array>
 
+    <!-- Render Scale Options (1.0x is the panel's native resolution) -->
+    <string-array name="display_options_render_scale" translatable="false">
+        <item>0.8x</item>
+        <item>0.9x</item>
+        <item>1.0x</item>
+        <item>1.1x</item>
+    </string-array>
+
+    <integer-array name="display_options_render_scale_values" translatable="false">
+        <item>80</item>
+        <item>90</item>
+        <item>100</item>
+        <item>110</item>
+    </integer-array>
+
     <!-- Tabs Location Options -->
     <string-array name="display_options_tabs_location" translatable="false">
         <item>@string/display_options_tabs_location_tray</item>

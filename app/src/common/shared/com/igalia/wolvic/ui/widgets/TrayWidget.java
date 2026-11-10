@@ -198,6 +198,19 @@ public class TrayWidget extends UIWidget implements WidgetManagerDelegate.Update
             }
         });
 
+        mBinding.handInputButton.setOnHoverListener(mButtonScaleHoverListener);
+        mBinding.handInputButton.setOnClickListener(view -> {
+            if (isImmersive()) {
+                return;
+            }
+            if (mAudio != null) {
+                mAudio.playSound(AudioEngine.Sound.CLICK);
+            }
+
+            mWidgetManager.setManualHandInput(!mWidgetManager.isManualHandInput());
+            view.requestFocusFromTouch();
+        });
+
         mBinding.tabsButton.setOnHoverListener(mButtonScaleHoverListener);
         mBinding.tabsButton.setOnClickListener(view -> {
             if (isImmersive()) {
@@ -682,6 +695,10 @@ public class TrayWidget extends UIWidget implements WidgetManagerDelegate.Update
         mSettingsWidget.attachToWindow(mAttachedWindow);
 
         mSettingsWidget.show(REQUEST_FOCUS, settingDialog);
+    }
+
+    public void setHandInputButtonState(boolean aVisible, boolean aUsingHands) {
+        mTrayViewModel.setHandInputButtonState(aVisible, aUsingHands);
     }
 
     public void setAddWindowVisible(boolean aVisible) {
