@@ -133,8 +133,8 @@ struct DeviceDelegateWaveVR::State {
       , isModelDataReady {}
   {
     memset((void*)devicePairs, 0, sizeof(WVR_DevicePosePair_t) * 2);
-    memset((void*)modelCachedData, 0, sizeof(WVR_CtrlerModel_t) * 2);
-    memset((void*)isModelDataReady, 0, sizeof(bool) * WVR_DEVICE_COUNT_LEVEL_1);
+    memset((void*)modelCachedData, 0, sizeof(modelCachedData));
+    memset((void*)isModelDataReady, 0, sizeof(isModelDataReady));
     gestures = GestureDelegate::Create();
     for (int32_t index = 0; index < kMaxControllerCount; index++) {
       controllers[index].index = index;
@@ -220,7 +220,9 @@ struct DeviceDelegateWaveVR::State {
             {WVR_InputId_Alias1_Grip, WVR_InputType_Button , WVR_AnalogType_None},
             {WVR_InputId_Alias1_A, WVR_InputType_Button , WVR_AnalogType_None},
             {WVR_InputId_Alias1_B, WVR_InputType_Button , WVR_AnalogType_None},
-            {WVR_InputId_Alias1_Thumbstick, WVR_InputType_Button | WVR_InputType_Touch | WVR_InputType_Analog, WVR_AnalogType_2D},
+            {WVR_InputId_Alias1_X, WVR_InputType_Button , WVR_AnalogType_None},
+            {WVR_InputId_Alias1_Y, WVR_InputType_Button , WVR_AnalogType_None},
+            // Thumbstick is not requested: Touchpad events cover both Focus+ and Focus 3 controllers.
     };
     WVR_SetInputRequest(WVR_DeviceType_HMD, inputIdAndTypes, sizeof(inputIdAndTypes) / sizeof(*inputIdAndTypes));
     WVR_SetInputRequest(WVR_DeviceType_Controller_Right, inputIdAndTypes, sizeof(inputIdAndTypes) / sizeof(*inputIdAndTypes));
@@ -232,7 +234,7 @@ struct DeviceDelegateWaveVR::State {
   void InitializeRender() {
     WVR_GetRenderTargetSize(&renderWidth, &renderHeight);
     VRB_GL_CHECK(glViewport(0, 0, renderWidth, renderHeight));
-    VRB_DEBUG("Recommended size is %ux%u", renderWidth, renderHeight);
+    VRB_LOG("Recommended size is %ux%u", renderWidth, renderHeight);
     if (renderWidth == 0 || renderHeight == 0) {
       VRB_ERROR("Please check Wave server configuration");
       return;
@@ -294,7 +296,8 @@ struct DeviceDelegateWaveVR::State {
     if (aController.is6DoF) {
       beamTransform.TranslateInPlace(vrb::Vector(0.0f, 0.01f, -0.05f));
     }
-    delegate->CreateController(aController.index, aController.is6DoF ? static_cast<int>(aController.hand) : 0,
+    // The model index is the controller's hand: a single 3DoF controller reports as either hand.
+    delegate->CreateController(aController.index, static_cast<int>(aController.hand),
             aController.is6DoF ? "HTC Vive 6DoF Controller" : "HTC Vive 3DoF Controller",
             beamTransform);
     delegate->SetLeftHanded(aController.index, aController.hand == ElbowModel::HandEnum::Left);
@@ -317,6 +320,15 @@ struct DeviceDelegateWaveVR::State {
   void UpdateControllers() {
     if (!delegate) {
       return;
+    }
+
+    static uint32_t sDiagCounter = 0;
+    if ((sDiagCounter++ % 180) == 0) {
+      VRB_LOG("[WaveVRInput] focusCapturedBySystem=%d interactionMode=%d", WVR_IsInputFocusCapturedBySystem(), WVR_GetInteractionMode());
+      for (Controller& c: controllers) {
+        VRB_LOG("[WaveVRInput] controller %d type=%d connected=%d dof6=%d created=%d enabled=%d", c.index, c.type,
+                WVR_IsDeviceConnected(c.type), c.is6DoF, c.created, c.enabled);
+      }
     }
 
     if (WVR_IsInputFocusCapturedBySystem()) {
@@ -360,6 +372,8 @@ struct DeviceDelegateWaveVR::State {
         }
         controller.enabled = true;
         delegate->SetEnabled(controller.index, true);
+        // BrowserWorld hides the controller model unless the mode is Device.
+        delegate->SetMode(controller.index, ControllerMode::Device);
         delegate->SetCapabilityFlags(controller.index, flags);
       }
 
@@ -367,27 +381,20 @@ struct DeviceDelegateWaveVR::State {
       uint32_t ctl_touch = WVR_GetInputDeviceCapability(controller.type, WVR_InputType_Touch);
       uint32_t ctl_analog = WVR_GetInputDeviceCapability(controller.type, WVR_InputType_Analog);
 
-      const bool bumperPressed = (controller.is6DoF) ? WVR_GetInputButtonState(controller.type, WVR_InputId_Alias1_Trigger)
-                                  : WVR_GetInputButtonState(controller.type, WVR_InputId_Alias1_Bumper);
+      // Flow's 3DoF controller reports its main button as Trigger, not Bumper.
+      const bool bumperPressed = WVR_GetInputButtonState(controller.type, WVR_InputId_Alias1_Trigger);
 
-      // ABXY buttons
-      if (ctl_button & WVR_InputId_Alias1_A) {
+      // ABXY buttons: the left controller reports X/Y, the right one A/B.
+      if (controller.hand == ElbowModel::HandEnum::Left) {
+        const bool xPressed = WVR_GetInputButtonState(controller.type, WVR_InputId_Alias1_X);
+        delegate->SetButtonState(controller.index, ControllerDelegate::BUTTON_X, device::kImmersiveButtonA, xPressed, xPressed);
+        const bool yPressed = WVR_GetInputButtonState(controller.type, WVR_InputId_Alias1_Y);
+        delegate->SetButtonState(controller.index, ControllerDelegate::BUTTON_Y, device::kImmersiveButtonB, yPressed, yPressed);
+      } else {
         const bool aPressed = WVR_GetInputButtonState(controller.type, WVR_InputId_Alias1_A);
-        const bool aTouched = WVR_GetInputTouchState(controller.type, WVR_InputId_Alias1_A);
-        if (controller.hand == ElbowModel::HandEnum::Left) {
-          delegate->SetButtonState(controller.index, ControllerDelegate::BUTTON_X, device::kImmersiveButtonA, aPressed, aTouched);
-        } else if (controller.hand == ElbowModel::HandEnum::Right) {
-          delegate->SetButtonState(controller.index, ControllerDelegate::BUTTON_A, device::kImmersiveButtonA, aPressed, aTouched);
-        }
-      }
-      if (ctl_button & WVR_InputId_Alias1_B) {
+        delegate->SetButtonState(controller.index, ControllerDelegate::BUTTON_A, device::kImmersiveButtonA, aPressed, aPressed);
         const bool bPressed = WVR_GetInputButtonState(controller.type, WVR_InputId_Alias1_B);
-        const bool bTouched = WVR_GetInputTouchState(controller.type, WVR_InputId_Alias1_B);
-        if (controller.hand == ElbowModel::HandEnum::Left) {
-          delegate->SetButtonState(controller.index, ControllerDelegate::BUTTON_Y, device::kImmersiveButtonB, bPressed, bTouched);
-        } else if (controller.hand == ElbowModel::HandEnum::Right) {
-          delegate->SetButtonState(controller.index, ControllerDelegate::BUTTON_B, device::kImmersiveButtonB, bPressed, bTouched);
-        }
+        delegate->SetButtonState(controller.index, ControllerDelegate::BUTTON_B, device::kImmersiveButtonB, bPressed, bPressed);
       }
 
       const bool touchpadPressed = WVR_GetInputButtonState(controller.type, WVR_InputId_Alias1_Touchpad);
@@ -396,7 +403,8 @@ struct DeviceDelegateWaveVR::State {
 
       // Although Focus only has two buttons, in order to match WebXR input profile (squeeze placeholder),
       // we make Focus has three buttons.
-      delegate->SetButtonCount(controller.index, 3);
+      // Buttons A/B map to immersive indices 4/5, so the count must cover them.
+      delegate->SetButtonCount(controller.index, 7);
       delegate->SetButtonState(controller.index, ControllerDelegate::BUTTON_TOUCHPAD, device::kImmersiveButtonTouchpad, touchpadPressed, touchpadTouched);
       delegate->SetButtonState(controller.index, ControllerDelegate::BUTTON_TRIGGER, device::kImmersiveButtonTrigger, bumperPressed, bumperPressed);
       if (controller.is6DoF) {
@@ -723,12 +731,12 @@ DeviceDelegateWaveVR::ProcessEvents() {
         m.isRunning = false;
         return;
       }
-      case WVR_EventType_SystemInteractionModeChanged: {
-        VRB_WAVE_EVENT_LOG("WVR_EventType_SystemInteractionModeChanged");
+      case WVR_EventType_InteractionModeChanged: {
+        VRB_WAVE_EVENT_LOG("WVR_EventType_InteractionModeChanged");
       }
         break;
-      case WVR_EventType_SystemGazeTriggerTypeChanged: {
-        VRB_WAVE_EVENT_LOG("WVR_EventType_SystemGazeTriggerTypeChanged");
+      case WVR_EventType_GazeTriggerTypeChanged: {
+        VRB_WAVE_EVENT_LOG("WVR_EventType_GazeTriggerTypeChanged");
       }
         break;
       case WVR_EventType_TrackingModeChanged: {

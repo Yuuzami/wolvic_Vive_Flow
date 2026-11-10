@@ -11,7 +11,7 @@ apply plugin: 'kotlin-android'
 
 // versions.gradle was removed upstream; WaveVR values live here now
 def versions = [wavevr: "5.6.0"]
-def build_versions = [min_sdk_wave: 25, target_sdk_wave: 31]
+def build_versions = [min_sdk_wave: 26, target_sdk_wave: 31]
 
 // Apply AGConnect plugin only for Huawei builds
 if (getGradle().getStartParameter().getTaskRequests().toString() =~ /[Hh]vr/
@@ -834,15 +834,15 @@ dependencies {
 
         // unzip aar
         def unzipDir = file("${rootDir}/third_party/wavesdk/build/${aarFilename}-${versions.wavevr}")
-        def aarFile = file("${rootDir}/third_party/wavesdk/${aarFilename}.aar")
+        def aarFile = "${rootDir}/../third_party/wave_5.6.0_native/repo/com/htc/vr/wvr_client/5.6.0/wvr_client-5.6.0.aar" /* file("${rootDir}/third_party/wavesdk/${aarFilename}.aar") */
         if (aarFile != null) {
             copy {
                 println 'unzip ' + aarFile
                 from zipTree(aarFile)
                 into unzipDir
             }
-            wavevrImplementation fileTree(dir: "${rootDir}/third_party/wavesdk/", include: ['*.aar'])
-            wavevrStoreImplementation fileTree(dir: "${rootDir}/third_party/wavesdk/", include: ['*.aar'])
+            wavevrImplementation "com.htc.vr:wvr_client:${versions.wavevr}" /* fileTree(dir: "${rootDir}/third_party/wavesdk/", include: ['*.aar']) */
+            wavevrStoreImplementation "com.htc.vr:wvr_client:${versions.wavevr}" /* fileTree(dir: "${rootDir}/third_party/wavesdk/", include: ['*.aar']) */
         }
     }
 

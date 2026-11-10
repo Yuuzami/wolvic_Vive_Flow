@@ -1235,10 +1235,10 @@ BrowserWorld::StartFrame() {
     }
   }
 
-#if defined(OCULUSVR)
-#if defined(STORE_BUILD)
+#if defined(OCULUSVR) && defined(STORE_BUILD)
   ProcessOVRPlatformEvents();
 #endif
+#if defined(OCULUSVR) || defined(WAVEVR)
   m.device->ProcessEvents();
 #endif
   m.context->Update();

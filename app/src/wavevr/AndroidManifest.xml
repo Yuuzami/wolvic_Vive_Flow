@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
+    <!-- GeckoView takes a wake lock when video plays; without the permission the SecurityException crashes Gecko. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" tools:node="replace"/>
+
     <application  tools:replace="android:theme" android:theme="@style/FxR.Dark" tools:remove="android:roundIcon">
         <activity android:name=".VRBrowserActivity"
                   android:screenOrientation="landscape">
