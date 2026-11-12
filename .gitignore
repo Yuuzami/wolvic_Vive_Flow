@@ -39,6 +39,8 @@ captures/
 
 # Keystore files
 *.jks
+*.keystore
+keystore.properties
 
 # Local checkout of localization files
 l10n-repo/

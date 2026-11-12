@@ -1,16 +1,93 @@
-# Wolvic XR Browser
+# Wolvic for HTC VIVE Flow
 
-The goal of the Wolvic project is to create a full-featured browser exclusively AR and VR headsets.
+Unofficial fork of [Wolvic](https://github.com/Igalia/wolvic) ([wolvic.com](https://www.wolvic.com)) that builds and runs on the **HTC VIVE Flow**, an Android 9 (API 28) headset that uses the VIVE **Wave SDK**. It is a personal-use port and is not affiliated with or supported by Igalia or HTC.
 
-You can find us in [wolvic.com](https://www.wolvic.com), Mastodon [@WolvicXR](https://floss.social/@WolvicXR), Twitter [@wolvicxr](https://twitter.com/wolvicxr), and at [info@wolvic.com](mailto:info@wolvic.com).
+- **Target device:** HTC VIVE Flow only. Other headsets are not tested in this fork, even though the upstream build flavors are still in the tree.
+- **Platform flavor:** `wavevr` (package `com.igalia.wolvic.internal`) or `wavevrStore` (package `com.igalia.wolvic`).
+- **Wave SDK:** 5.6.0. The Flow supports Wave SDK up to 6.0.0, because later versions raise the minimum Android API level above 28.
+- **Browser engine:** GeckoView (prebuilt nightly from Mozilla's maven repository). The Chromium backend is not used.
+- **ABI:** `arm64` only.
+- **SDK levels:** `minSdk` 26, `targetSdk` 31 for the Wave flavors.
+- **Upstream:** `Igalia/wolvic`. This fork is not intended to be contributed back, because upstream no longer supports the VIVE Flow. Base branch of this port: `flow-port`.
 
-Want to learn more about Wolvic? Read our [FAQ](https://wolvic.com/en/faq)!
+## Building for the VIVE Flow
 
-## Setup instructions
+### Prerequisites
 
-> For setup instructions using the development version of the Chromium backend check [this instructions out instead](CHROMIUM.md)
+- Git, with **Git Bash** installed. On Windows, Git's `bin` folder must come before `C:\Windows\System32` on `PATH`, otherwise CMake picks up the WSL `bash.exe` launcher and the KTX-Software step fails.
+- Android SDK with `ANDROID_HOME` set (or `sdk.dir` in `local.properties`) and the SDK licenses accepted. Gradle downloads the Android platform, build-tools, NDK and CMake it needs.
+- JDK 21. Gradle provisions it automatically through the daemon toolchain settings (`gradle/gradle-daemon-jvm.properties`), which needs network access on the first build.
+- Network access to `maven.mozilla.org` for GeckoView and the Android Components.
+- The **VIVE Wave SDK 5.6.0 (native)** from the [VIVE Developer Resources archive](https://developer.vive.com/resources/vive-wave/download/archive/5_6_0/). It is proprietary and is not part of this repository.
 
-### GeckoView local substitution
+### 1. Clone with submodules
+
+```bash
+git clone --recurse-submodules https://github.com/Yuuzami/wolvic_Vive_Flow.git wolvic
+git -C wolvic checkout flow-port
+```
+
+The build fails without the submodules (`vrb`, `tinygltf`, `KTX-Software`).
+
+### 2. Place the Wave SDK next to the repository
+
+The build reads the SDK from `../third_party/wave_5.6.0_native`, outside the repository. Unzip it so that this file exists:
+
+```
+<parent folder>/
+  wolvic/                                  <- this repository
+  third_party/
+    wave_5.6.0_native/
+      repo/com/htc/vr/wvr_client/5.6.0/wvr_client-5.6.0.aar
+```
+
+The `.aar` is unpacked automatically, but only when the first Gradle task name contains `wavevr`, so always build through a `wavevr` task.
+
+### 3. Build
+
+From the repository root, in PowerShell with Git Bash first on `PATH`:
+
+```powershell
+$env:PATH = "$env:LOCALAPPDATA\Programs\Git\bin;$env:PATH"
+.\gradlew.bat :app:assembleWavevrArm64GeckoGenericDebug
+```
+
+If you hit the WSL `bash.exe` error after a failed attempt, delete `app/.cxx` and build again.
+
+Output: `app/build/outputs/apk/wavevrArm64GeckoGeneric/debug/Wolvic-wavevr-arm64-gecko-generic-debug.apk`
+
+### 4. Install on the Flow
+
+With developer mode and USB debugging enabled on the headset:
+
+```bash
+adb install -r app/build/outputs/apk/wavevrArm64GeckoGeneric/debug/Wolvic-wavevr-arm64-gecko-generic-debug.apk
+adb shell am start -n com.igalia.wolvic.internal/com.igalia.wolvic.VRBrowserActivity
+```
+
+Add `-e homepage "https://example.com"` to the `am start` command to load a specific homepage.
+
+### Release build
+
+```powershell
+.\gradlew.bat :app:assembleWavevrArm64GeckoGenericRelease
+```
+
+The release APK is unsigned (and not installable) unless a keystore is configured. Create a `keystore.properties` in the repository root (git-ignored) with `storeFile` (relative to the repository root, or absolute), `storePassword`, `keyAlias` and `keyPassword`. Updates must be signed with the same key as the installed version, so keep the keystore safe.
+
+## Build options
+
+Optional properties for `user.properties` in the repository root:
+
+- `simultaneousDevProduction=true`: adds a dev applicationID suffix so dev and production builds can be installed side by side.
+- `useDebugSigningOnRelease=true`: signs release builds with the debug keystore for local testing. Not for distribution.
+- `useStaticVersionCode=true`: keeps the version code constant between builds, avoiding needless Gradle task re-runs.
+
+## Upstream developer notes
+
+The rest of this file is the upstream Wolvic developer documentation. The Flow build above does not need any of it, apart from the build options (`user.properties`) further down.
+
+### GeckoView local substitution (optional)
 
 After [PR #70](https://github.com/Igalia/wolvic/pull/70), WebXR sessions won't work with the prebuilt maven GeckoView libraries because that PR introduced a change in the GeckoView protocol. So you have to build GeckoView manually by applying patches at [this repository](https://github.com/Igalia/wolvic-gecko-patches).
 
@@ -25,78 +102,13 @@ Do not forget to run a Gradle sync in Android Studio after changing `local.prope
 
 For step by step guide check [here](https://github.com/Igalia/wolvic/wiki/Developer-workflow#building-gecko).
 
-### Clone Wolvic
+### Android Studio
 
-```bash
-git clone git@github.com:Igalia/wolvic.git
-cd wolvic
-```
-
-### Clone the third-party repo
-
-If you're developing for the Oculus, Huawei, Pico, or VIVE, you need to clone the repo with third-party SDK files.
-
-```bash
-wolvic$ git clone git@github.com:Igalia/wolvic-third-parties.git third_party
-```
-
-This repo is only available to Igalia members. If you have access to the relevant SDK but not this repo, you can manually place them here:
-
- - `third_party/OVRPlatformSDK/` for Oculus (should contain a `Android` and `Include` folders)
- - `third_party/hvr/` for Huawei (should contain  `arm64-v8a`, `armeabi-v7a` and `include` folders)
- - `third_party/wavesdk/` for Vive (should contain a `build` folder, among other things)
- - `third_party/picoxr` [Pico OpenXR Mobile SDK](https://developer-global.pico-interactive.com/sdk?deviceId=1&platformId=3&itemId=11) (should contain `libs` folders, among other things that are not necessary for Wolvic)
- - `third_party/spaces` [for Snapdragon Spaces](https://spaces.qualcomm.com/)(should contain `libopenxr_loader.aar`)
- - `third_party/aliceimu/` for [Huawei Vision Glass](https://consumer.huawei.com/cn/wearables/vision-glass/) (should contain an `.aar` file with the IMU library for the glasses)
-
-The [repo in `third_party`](https://github.com/Igalia/wolvic-third-parties) can be updated like so:
-
-```bash
-pushd third_party && git fetch && git checkout main && git rebase origin/main && popd
-```
-
-### Fetch Git submodules
-
-You may need to set up [two-factor authentication](https://blog.github.com/2013-09-03-two-factor-authentication/#how-does-it-work-for-command-line-git) for the command line.
-
-```bash
-wolvic/third_party$ git submodule update --init --recursive
-```
-
-You can build for different devices:
-
-- **`oculusvr`**: Oculus Quest
-- **`hvr`**: Huawei VR Glasses
-- **`wavevr`**: VIVE Focus
-- **`picoxr`**: Pico 4 and (untested) Pico Neo 3
-- **`lynx`**: Lynx R1
-- **`spaces`**: Lenovo A3
-- **`visionglass`**: Huawei Vision Glass
-
-For testing on a non-VR device:
-
-- **`noapi`**: Runs on standard Android phones without a headset
-
-Building for Huawei and WaveVR requires access to their respective SDKs which are not included in this repo.
-
-The command line version of `gradlew` requires JDK 11. If you see an error that Gradle doesn't understand your Java version, check which version of you're using by running `java -showversion` or `java -version`. You're probably using and older JDK, which won't work.
-
-*Open the project with [Android Studio](https://developer.android.com/studio/index.html)* then build and run it. Depending on what you already have installed in Android Studio, the build may fail and then may prompt you to install dependencies. Just keep doing as it suggests. To select the device to build for, go to `Tool Windows > Build Variants` and select a build variant corresponding to your device.
-
-*If you want to build Wolvic for WaveVR SDK:*
-
-Download the [VIVE Wave SDK](https://developer.vive.com/resources/knowledgebase/wave-sdk/) from the [VIVE Developer Resources](https://developer.vive.com/resources/vive-wave/download/archive/320/), and unzip it. Then, from the top-level project directory, run:
-
-```bash
-mkdir -p third_party/wavesdk
-cp wave_3.2.0_native_1/repo/com/htc/vr/wvr_client/3.2.0/wvr_client-3.2.0.aar third_party/wavesdk/wvr_client.aar
-```
-
-Make certain to set the build flavor to `wavevrDebug` in Android Studio before building the project.
+Open the repository root in [Android Studio](https://developer.android.com/studio/index.html), then go to `Tool Windows > Build Variants` and select `wavevrArm64GeckoGenericDebug`. The Wave SDK placement and Git Bash requirements above still apply.
 
 ## Local Development
 
-> By default Wolvic will try to download prebuilt GeckoView libraries from [Mozilla's maven repositories](https://maven.mozilla.org/maven2/org/mozilla/geckoview/?prefix=maven2/org/mozilla/geckoview/), where WebXR won't work and that should be used just for testing the 2D browser or to download browser features. If you want to have this, just skip the *GeckoView local substitution* part of the [Setup instructions](#setup-instructions).
+> By default the build downloads prebuilt GeckoView libraries from [Mozilla's maven repositories](https://maven.mozilla.org/maven2/org/mozilla/geckoview/?prefix=maven2/org/mozilla/geckoview/). This is what the Flow build uses. Skip the *GeckoView local substitution* section above unless you need a custom GeckoView.
 
 ## Install dev and production builds on device simultaneously
 

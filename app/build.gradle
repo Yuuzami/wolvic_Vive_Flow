@@ -53,6 +53,13 @@ def getUseDebugSigningOnRelease = { ->
     return false
 }
 
+// Read separately from user.properties because settings.gradle logs every user.properties value.
+def keystoreProps = new Properties()
+def keystorePropsFile = rootProject.file('keystore.properties')
+if (keystorePropsFile.canRead()) {
+    keystorePropsFile.withInputStream { keystoreProps.load(it) }
+}
+
 def getHVRAppId = { ->
     if (gradle.hasProperty("userProperties.HVR_APP_ID")) {
         return gradle."userProperties.HVR_APP_ID"
@@ -192,12 +199,23 @@ android {
         jvmTarget = '11'
     }
 
+    signingConfigs {
+        release {
+            if (keystoreProps['storeFile']) {
+                storeFile = rootProject.file(keystoreProps['storeFile'])
+                storePassword = keystoreProps['storePassword']
+                keyAlias = keystoreProps['keyAlias']
+                keyPassword = keystoreProps['keyPassword']
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled = true
             shrinkResources = true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            signingConfig = getUseDebugSigningOnRelease() ? debug.signingConfig : release.signingConfig
+            signingConfig = getUseDebugSigningOnRelease() ? debug.signingConfig : (keystoreProps['storeFile'] ? signingConfigs.release : null)
             buildConfigField 'String', 'OTEL_ENDPOINT', "\"${getOtelEndpoint()}\""
         }
         debug {
